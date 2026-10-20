@@ -1,0 +1,29 @@
+body {
+    font-family: Tahoma, sans-serif;
+    background-color: #d9dee7;
+    color:#20242b;
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 32px 24px;
+    line-height: 1.6;
+}
+
+h1 {
+    font-size: 2.5rem;
+    margin-bottom: 4px;
+}
+
+h2 {
+    border-bottom: 2px solid #d9dee7;
+    padding-bottom: 8px;
+    margin-top: 40px;
+}
+
+a {
+    color: #9df5bc;
+    text-decoration: none;
+}
+
+a:hover {
+    text-decoration: underline;
+}
