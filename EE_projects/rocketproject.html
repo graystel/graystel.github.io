@@ -7,22 +7,121 @@
     <title> Avionics Projects -- Heather Li</title>
 </head>
 <body>
+    <p><a href="../index.html"> Home</a> | <a href="index.html"> EE projects </a> | ML/AI + CS | About Me</p>
     <h1>
         Avionics Projects
     </h1>
-    <p> <a href="#2026_27"> 2026-27 </a>| 2025-26                  <a href="index.html"> Back </a> </p>
+    <p> <a href="#2026_27"> 2026-27 (in progress) </a>| <a href="#2025_26"> 2025-26 </a></p>
     <p>
         Currently (June 2026-Present), I am an Avionics RE (responsible engineer) for the analog avionics boards in the Ares team in Rocket Project @ UCLA. I am designing two boards for the avionics system. The first board is for receiving differential pair analog load cell (LC) data from our recovery system, converting the analog values to digital values, and then processing the digital values with an ESP32 P4 Module. The second board achieves the same purpose for faciliating single-ended pressure transducer (PT) data from our engine/tanks.
     <p>
     <p>
-        Previously (Jan 2026-June 2026), I was one of three Avionics Leads for the entire avionics system on the Prometheus team in Rocket Project @ UCLA. This meant that I designed the schematic/PCB for the primary bodytube board (a more primitive version of the current Ares system), and I designed the schematic for the secondary bodytube board which aimed to replicate the nosecone sensors (GPS, accelerometer, LoRA radio module) and conduct telemetry. 
+        Previously (Jan 2026-June 2026), I was one of three Avionics Leads for the entire avionics system on the Prometheus team in Rocket Project @ UCLA.  This meant that I designed the schematic/PCB for the primary bodytube board (a more primitive version of the current Ares system), and I designed the schematic for the secondary bodytube board which aimed to replicate the nosecone sensors (GPS, accelerometer, LoRA radio module) and conduct telemetry. 
     </p>
 </body>
 <section id="2026_27">
 <body>
     <h2>
-        2026-27
+        2026-27 (in progress)
     </h2>
+    <p>
+        The schematics were built using the datasheets for each IC/component as the primary source of truth, while applying electrical engineering first principles. "Heritage systems" (i.e. what prior Avionics Leads have done to meet the demands of the rocket) were also taken into consideration, but scrutinized heavily, with some of the following portions highlighting places where my designs deviated from heritage due to my own interpretation of datasheets (or what I perceived to be logical based on EE first principles).
+    </p>
+    <h3>
+        Analog Board #1
+    </h3>
+    <p>
+       Figures 1-4 show the schematic for the analog board intended to take in PT values for up to 8 separate PTs (intended for either 5V or 11V1 inputs). This board deviates from the known, mostly-working heritage due to the support of more than 6 PTs and a greater range of input voltages for flexibility. 
+    </p>
+    <figure>
+        <img src="../EE_projects/2026_27images/ptboardschematicpt4.png" style="width: 50%; height: auto;">
+        <figcaption>Figure 1: top/right of V1 schematics for the PT board</figcaption>
+    </figure>
+    <p>
+       Figure 1 shows test points for the board. I applied good engineering practice to include particular test points. The power testpoints are self-explanatory, but I ensured that there was a TP for REFIO -- an output pin on the ADS8688 -- because prior experience with debugging the ADS8688 relied heavily on this pin. In 2025-26, the ADS8688 failed to output meaningful values (outputting exclusively 0.0V or 5.12V without response to the environment). According to the datasheet, the expected REFIO value is supposed to be around 4.1V, but measuring with a multimeter gave an almost 0V value, leading to a closer examination of the datasheet for the pins and expected wiring, and subsequently discovering floating pins which needed to be routed to be GND. Using jumper wires to crudely connect the floating AGND pins to GND gave a closer value of 4.7V for the REFIO output. This motivated the design of the final board schematic for last year. 
+    </p>
+    <p>
+       Figure 1 also shows two CAN tranceivers, with which the ESP32 P4 Module on this analog board can communicate with other boards in the bodytube (namely, the radio/RF board in the bodytube). The VIO pin differed from the heritage system in that prior systems routed it to 5V, while the datasheet recommends routing to the same power input supply as the microcontroller that the CAN transceiver would interface with. Implementing the CAN trasceivers have given me experience working with CAN bus and UART communication protocols. 
+    </p>
+    <p>
+        I also implemented an SD card, which uses SPI communication. 
+    </p>
+    <figure>
+        <img src="../EE_projects/2026_27images/ptboardschematicpt3.png" style="width: 50%; height: auto;">
+        <figcaption>Figure 2: top/left of V1 schematics for the PT board</figcaption>
+    </figure>
+    <p>
+       Figure 2 shows the current sensor INA226, which previously did not work for the heritage system because they routed IN- to 3V3, which had no current at all obviously since there is no reason they would've link up the 5V to 3V directly. I used intuition to determine that the R1 resistor from last year in the Power -> 5V group was supposed to act as the shunt resistor and noted that the datasheet has a shunt voltage differential of around +/- 81.92 mV according to the datasheet. By V=IR, a shunt resistor value of 27mOhms supports up to around 3A current detection (or lower...in the future, I may change this resistor value to be lower to optimize heat loss and current sensing at the same time). Using a power table, I calculated the current delivered by the 5V power (or 3V3 power line) line to be well below that threshold. INA226 also uses I2C communication protocols, which I gained experience implementing through this experience.  
+    </p>
+    <p>
+        Figure 2 also shows the implementation of the USB 2.0 C port and a TVS diode. This TVS diode differs from any TVS diode used by the Avionics team in Rocket Project. Prior implementations of the USB 2.0 Micro port and the USB connection to the ESP32 has also been simply full-speed, which allows for an input capacitance of up to 12pF max for the TVS diode. The new ESP32 P4 Module supports high-speed USB datalines, which requires an input capacitance of below 1.5pF for the TVS diode. The previous TVS diode that was used had an input capacitance of 30pF, which turned out to be ultimately okay for the full-speed, but clearly simply way too large for the high speed. The new TVS diode has a low capacitance of around 0.015pF, which should work for the data speeds we wish for. I implemented the datasheet, and my own understanding of diodes, to route this portion of the schematic. 
+    </p>
+    <p>
+        Other parts of Figure 2 also show power management to meet the demands of this board. Some ICs require 5V, others require 3V3. There is a separate board in the Avionics system which outputs 5V to all boards -- from the DSUB-15 pin, the analog board intakes that 5V and uses a diode gate to switch between board power and USB power. I also used an LDO to get a 3V3 power line. 
+    </p>
+    <figure>
+        <img src="../EE_projects/2026_27images/ptboardschematicpt1.png" style="width: 50%; height: auto;">
+        <figcaption>Figure 3: bottom/left of V1 schematics for the PT board</figcaption>
+    </figure>
+    <p>
+        Figure 3 shows the main point of the board, which is the ADS8688, which accepts 8 single-ended analog inputs and converts to digital values. The array of filters on the inputs relies on an RC circuit for low pass filtering and also a voltage divider -- this halves the input analog values, and was implemented for flexibility, since I wasn't sure at the time of implementation the range of output values from the PT backing, and I wanted to be able to ensure that the input analog values are accepted by the ADS8688. The digital side of the ADC uses SPI communication with the ESP32 P4 Module.  
+    </p>
+    <figure>
+        <img src="../EE_projects/2026_27images/ptboardschematicpt2.png" style="width: 50%; height: auto;">
+        <figcaption>Figure 4: bottom/right of V1 schematics for the PT board</figcaption>
+    </figure>
+    <p>
+        Figure 4 shows the ESP32 wiring, which summarizes our use of UART, SPI, and I2C communication protocols. The other pins (BOOT/EN/RESET) show the most straightforward implementation of pullup/pulldown resistors, and there are decoupling capacitors on the 3V3 input line. (I acknowledge are other decoupling caps or pullup/down resistors on other ICs, but I'm highlighting the ones on the ESP32 since other sections have more going on.)
+    </p>
+    <figure>
+        <img src="../EE_projects/2026_27images/ptboardpcb.png" style="width: 50%; height: auto;">
+        <figcaption>Figure 5: top/bottom traces for the PT board</figcaption>
+    </figure>
+    <p>
+        The PCB design of the PT board is shown in Figure 5; the routing aims to optimize the preservation of analog signals by keeping each of them on the same plane and minimizing the length of the routes. I kept each signal line distant from each other, and then also kept the other side of the ADS8688 (the digital, SPI communication side) as separate from the analog signals as possible. 
+    </p>
+    <p>
+        For other ICs, I tried to keep the filtering resistors and capacitors (and decoupling capacitors) as close to their schematic pins as possible. In the 2025-26 designs, I mostly routed on instinct without the correct understanding on keeping filters or decoupling close to ICs. This is a major difference between the PCB designs from last year!
+    </p>
+    <figure>
+        <img src="../EE_projects/2026_27images/ptboardpcbtop.png" style="width: 20%; height: auto;">
+        <img src="../EE_projects/2026_27images/ptboardpcbgnd.png" style="width: 20%; height: auto;">
+        <img src="../EE_projects/2026_27images/ptboardpcbpower.png" style="width: 20%; height: auto;">
+        <img src="../EE_projects/2026_27images/ptboardpcbbottom.png" style="width: 20%; height: auto;">
+        <figcaption>Figure 6: 4-layer PCB for the PT board</figcaption>
+    </figure>
+    <p>
+        Figure 6 shows each of the four layers of the PCB. The power layer has a power polygon for 3V3 and another for 5V (and the actual polygon shape will probably be optimized in the future). 
+    </p>
+    <h3>
+        Analog Board #2
+    </h3>
+    <p>
+       Figures 1-4 shows the board for taking in LC values for up to four separate LCs (intended for either 5V excitation or 11V1 excitation LCs). This board deviates from the known, mostly-working heritage due to the support of more than one LC and a greater range of excitation voltages (Wheatstone bridge configurations). Most of these images show the same components and implementations as the PT board, with the main difference being the ADS1256 (and the associated OP AMP and crystal oscillator). 
+    </p>
+    <figure>
+        <img src="../EE_projects/2026_27images/lcboardschematicpt1.png" style="width: 40%; height: auto;">
+        <img src="../EE_projects/2026_27images/lcboardschematicpt2.png" style="width: 40%; height: auto;">
+        <img src="../EE_projects/2026_27images/lcboardschematicpt3.png" style="width: 40%; height: auto;">
+        <img src="../EE_projects/2026_27images/lcboardschematicpt4.png" style="width: 40%; height: auto;">
+        <figcaption>Figure 7-10 (top/left, top/right, bottom/left, bottom/right): schematics for the LC board</figcaption>
+    </figure>
+    <p>
+        Figure 9 is where the differences mostly are. The ADS1256 intakes differential signals, which are filtered with a simple RC filter. I also implemented the OP AMP 350 (output 2.5V), which applied the first principles of amplifiers and also the datasheet information.
+    </p>
+    <figure>
+        <img src="../EE_projects/2026_27images/lcboardpcb.png" style="width: 50%; height: auto;">
+        <figcaption>Figure 11: top/bottom traces for the LC board</figcaption>
+    </figure>
+    Figure 11 shows the top/bottom traces for the LC board. I applied similar principles as the PT board -- keeping resistors and capacitors close to their ICs, keeping digital signals away from analog inputs (such as routing the digital lines around the crystal oscillator), and also keeping the differential signals as close or "symmetric" as possible. By nature of differential signals, as long as they experience the same noise, the difference between the two signals still remains accurate. 
+    <figure>
+        <img src="../EE_projects/2026_27images/lcboardpcbtop.png" style="width: 20%; height: auto;">
+        <img src="../EE_projects/2026_27images/lcboardpcbgnd.png" style="width: 20%; height: auto;">
+        <img src="../EE_projects/2026_27images/lcboardpcbpower.png" style="width: 20%; height: auto;">
+        <img src="../EE_projects/2026_27images/lcboardpcbbottom.png" style="width: 20%; height: auto;">
+        <figcaption>Figure 11: top/bottom traces for the LC board</figcaption>
+    </figure>
+    The pours are the same as the PT board (Analog #1 Board). 
 </body>
 </section>
 <section id="2025_26">
@@ -30,6 +129,40 @@
     <h2>
         2025-26
     </h2>
-</body>
+    <p>
+        The full lifecycle for the main bodytube board for the Prometheus team -- this board differed from the future 2026-27 version in that it lacked some of the more advanced sensors (current sensor) and ICs (CAN tranceivers). It was also a self-contained system, meaning both ADCs (ADS1256 and ADS8688) for the two types of data (LCs/PTs respectively) existed on the board at the same time, even though one was used at a time. The ADS1256 was chosen for the ability to support differential signals, making it suitable for the differential outputs of the Wheatstone bridge inside a load cell; conversely, our pressure transducers output single-ended signals, leading us to select an ADC which supports single-ended analog inputs (ADS8688). Much of the schematic wiring was motivated by heritage design (designs which have worked for Avionics Leads in the past). The application of my own EE knowledge only became evident in the 2026-27 designs, due both to having gone through this experience, and also having a much earlier head start on designing (allowing me to comb through and question heritage designs much more thoroughly). 
+    </p>
+    <figure> 
+            <img src="../EE_projects/2025_26images/mainbtboardschematic.png" style="width: 50%; height: auto;">
+            <figcaption> Figure 1: schematic design for the main bodytube board</figcaption>
+        </figure>
+    <p>
+        The schematic design shown in Figure 1 shows the wiring for ICs used to support collecting LC data from test rocket recovery systems and PT data from flight rocket's tanks/engine throughout flight. The wiring was primarily extracted from heritage systems. 
+    </p>
+    <figure> 
+            <img src="../EE_projects/2025_26images/mainbtboardpcb.png" style="width: 50%; height: auto;">
+            <figcaption> Figure 2: PCB design for the main bodytube board</figcaption>
+    </figure>
+        <p>
+        The PCB design shown in Figure 2 gave me experience with routing 4-layer PCBs. The layout of the ICs and their associated basic components (such as decoupling capacitors, pull up or pulldown resistors, low pass filters, etc.) were given little thought at the time -- such mistakes were rectified (or at least acknowledged) in my future designs.  
+        </p>
+    <figure> 
+            <img src="../EE_projects/2025_26images/mainbtboard.JPG" style="width: 50%; height: auto;">
+            <figcaption> Figure 3: (Final) board design for the main bodytube board</figcaption>
+    </figure>
+    <figure> 
+            <img src="../EE_projects/2025_26images/mainbtboardsoldered.jpg" style="width: 50%; height: auto;">
+            <figcaption> Figure 4: (Initial) board design for the main bodytube board</figcaption>
+    </figure>
+    <p>
+        The soldered board (Figure 4) exemplifies the manufacturing that I did as an Avionics Lead, but it differs from the bare board (Figure 3) due to the fact that the bare board is a subsequent version of the soldered board. The board in Figure 4 only worked for the LC/ADS1256, but not the PTs/ADS8688. The bare board in Figure 3 is the revamped version of the main bodytube board. 
+    </p>
+    <figure>
+        <img src="../EE_projects/2025_26images/mainbtboardintegrated.jpg" style="width: 50%; height: auto;">
+        <figcaption> Figure 5: Integrated (final) bodytube board</figcaption>
+    </figure>
+    <p>
+        The main difference between Figure 5 and Figure 4 is the ADS8688 -- the faulty initial board design failed to route GND to all AGND pins on the ADS8688 due to differences between the heritage and current symbols in Fusion360, leading to incorrect output values. Additionally, Figure 5 shows the flight rocket board, which only uses the PTs ADC and does not require any LC ADC components. 
+    </p>
 </section>
 </html>
